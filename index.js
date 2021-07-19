@@ -2,14 +2,23 @@ const { program } = require("commander");
 program.version("1.0.0");
 program.option("-s, --setup", "re-run setup prompts");
 program.option("-c, --check-mailboxes", "force check for new mailboxes");
+program.option(
+	"-u, --upload-voicemails",
+	"force upload all un-uploaded voicemails"
+);
 
 program.parse(process.argv);
 const options = program.opts();
 
 const fs = require("fs");
+const voicemail = require("./Utils/Voicemail");
 
 console.log(options);
 
+/**
+ * Wait for a certain duration before continuing
+ * @param {Integer} delay Delay in MS before continuing
+ */
 const waitFor = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
 
 /**
@@ -30,9 +39,16 @@ async function init() {
 		await require("./Utils/InboxFolders").createNewVoicemailBoxes(true);
 	}
 
+	if (options.uploadVoicemails) {
+		console.log(`Uploading voicemails...`);
+		await require("./Utils/Voicemail").uploadUnUploadedVoicemails(true);
+	}
+
 	console.log("Initalizing...");
 
-	const cron_CheckForBoxes = require("./CheckForNewVoicemailBoxes"); //Start cronjob checking for new boxes
+	//Start cronjob checking for new boxes
+	const cron_CheckForBoxes = require("./CheckForNewVoicemailBoxes");
+	voicemail.uploadFile("112", "msg0000.wav");
 }
 
 init();

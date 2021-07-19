@@ -1,6 +1,7 @@
 const mailboxes = require("../api/Mailboxes");
 const { readdirSync } = require("fs");
 const settings = require("./Settings");
+const path = require("path");
 module.exports = {
 	/**
 	 * Gets all folders configured to receive voicemails
@@ -37,8 +38,30 @@ module.exports = {
 	 * @returns {Array} Array of mailboxes that are configured to upload
 	 */
 	async getUploadableMailboxes() {
-		const mailboxes = await mailboxes.getMailboxes();
-		return mailboxes.filter((mailbox) => mailbox.upload);
+		const mbs = await mailboxes.getMailboxes();
+		return mbs.filter((mailbox) => mailbox.upload);
+	},
+
+	/**
+	 * Get the serverid for an extension with local id of...
+	 * @param {String} Extension The extension local id
+	 * @returns {String} The serverid for the extension
+	 */
+	async getServerIdForExtension(Extension) {
+		return (await this.getUploadableMailboxes()).filter(
+			(x) => x.extensionid === Extension
+		);
+	},
+
+	/**
+	 * Get a list of paths for mailboxes that are configured to upload
+	 * @returns {Array} Array of paths for mailboxes that are configured to upload
+	 */
+	async getUploadableMailboxPaths() {
+		const mbs = await this.getUploadableMailboxes();
+		return mbs.map((mailbox) =>
+			path.join(settings.vmFolder, mailbox.extensionid, settings.NewVmFolder)
+		);
 	},
 
 	/**
