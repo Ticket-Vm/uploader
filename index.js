@@ -1,5 +1,5 @@
 const { program } = require("commander");
-program.version("1.0.0");
+program.version(require("./package.json").version);
 program.option("-s, --setup", "re-run setup prompts");
 program.option("-c, --check-mailboxes", "force check for new mailboxes");
 program.option(
@@ -25,6 +25,11 @@ const waitFor = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
  * Initializes App
  */
 async function init() {
+	if (options.version) {
+		console.log("Version: " + require("./package.json").version);
+		return;
+	}
+
 	console.clear();
 
 	//If config is being re-ran
