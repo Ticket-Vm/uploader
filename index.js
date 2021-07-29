@@ -1,3 +1,5 @@
+"use strict";
+const chalk = require("chalk");
 const { program } = require("commander");
 program.version(require("./package.json").version);
 program.option("-s, --setup", "re-run setup prompts");
@@ -6,6 +8,7 @@ program.option(
 	"-u, --upload-voicemails",
 	"force upload all un-uploaded voicemails"
 );
+program.option("-vs, --verbose", "Enable Verbosity");
 
 program.parse(process.argv);
 const options = program.opts();
@@ -32,6 +35,10 @@ async function init() {
 
 	console.clear();
 
+	if (options.verbose) {
+		console.log(chalk.blue("Verbose Mode Enabled"));
+	}
+
 	//If config is being re-ran
 	if (!fs.existsSync("./Settings.json") || options.setup) {
 		await require("./setup")();
@@ -46,14 +53,23 @@ async function init() {
 
 	if (options.uploadVoicemails) {
 		console.log(`Uploading voicemails...`);
-		await require("./Utils/Voicemail").uploadUnUploadedVoicemails(true);
+		voicemail.uploadUnUploadedVoicemails(true);
 	}
 
 	console.log("Initalizing...");
 
 	//Start cronjob checking for new boxes
 	const cron_CheckForBoxes = require("./CheckForNewVoicemailBoxes");
-	voicemail.uploadFile("112", "msg0000.wav");
+	if (options.verbose) {
+		console.log("REQUESTING MONITORING FOR CONFIGURED DIRECTORIES");
+	}
+	voicemail.monitorMailboxes(options.verbose);
+
+	if (options.verbose) {
+		console.log("STARTING TO CHECK FOR UN-UPLOADED VOICEMAILS");
+	}
+	voicemail.uploadUnUploadedVoicemails(options.verbose);
+	console.log(chalk.green("Monitoring enabled!"));
 }
 
 init();

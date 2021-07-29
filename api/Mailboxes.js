@@ -12,10 +12,10 @@ async function getMailboxes() {
 
 		if (error.response.status === 401) {
 			console.error("UNAUTHORIZED!");
-			return undefined;
+			throw error;
 		} else if (error.response.status === 403) {
 			console.error("APIKEY IS INCORRECT!");
-			return undefined;
+			throw error;
 		}
 	}
 }
@@ -32,10 +32,10 @@ async function addMailbox(extension) {
 
 		if (error.response.status === 401) {
 			console.error("UNAUTHORIZED!");
-			return undefined;
+			throw error;
 		} else if (error.response.status === 403) {
 			console.error("APIKEY IS INCORRECT!");
-			return undefined;
+			throw error;
 		}
 	}
 }

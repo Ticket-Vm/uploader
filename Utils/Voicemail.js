@@ -5,7 +5,9 @@ const Inboxes = require("./InboxFolders");
 const Settings = require("./Settings");
 const UploadAPI = require("../api/Upload");
 const chalk = require("chalk");
-
+const chokidar = require("chokidar");
+let watchers = [];
+let _verbose = false;
 module.exports = {
 	/**
 	 * Formats the voicemail file id to not have a path
@@ -120,9 +122,10 @@ module.exports = {
 	 * @returns {Array} Array of voicemails that are not uploaded
 	 */
 	async uploadUnUploadedVoicemails(verbose) {
+		_verbose = verbose;
 		let voicemails = await this.getUnUploadedVoicemails();
 		voicemails.forEach((voicemail) => {
-			if (verbose) {
+			if (_verbose) {
 				console.log(
 					chalk.bgBlue.white(
 						`Uploading voicemails from extension ${voicemail.extensionid}`
@@ -130,15 +133,69 @@ module.exports = {
 				);
 			}
 			voicemail.voicemails.forEach((voicemailID) => {
-				if (verbose)
+				if (_verbose)
 					console.log(chalk.white(`\tUploading - ${voicemailID}....`));
 
 				this.uploadFile(voicemail.extensionid, voicemailID);
-				if (verbose) console.log(chalk.green(`\t\tDone!`));
+				if (_verbose) console.log(chalk.green(`\t\tDone!`));
 			});
 		});
 	},
 
+	/**
+	 * Monitor mailboxes for new voicemails
+	 */
+	async monitorMailboxes(verbose) {
+		_verbose = verbose;
+		let extensions = await Inboxes.getUploadableMailboxes();
+		extensions.forEach((extension) => {
+			const pathToFolder = path.join(
+				Settings.vmFolder,
+				`${extension.extensionid}`,
+				Settings.NewVmFolder
+			);
+
+			const pathToFile = path.join(pathToFolder, `*.txt`);
+			if (_verbose)
+				console.log(
+					chalk.bgBlue.white(
+						`Monitoring mailbox ${extension.extensionid} @ ${pathToFile}`
+					)
+				);
+			watchers.push(
+				chokidar
+					.watch(pathToFile, {
+						awaitWriteFinish: true,
+						ignoreInitial: true,
+					})
+					.on("add", () => {
+						if (_verbose)
+							console.log(
+								chalk.white(
+									`Voicemail Detected Extension ${extension.extensionid}!`
+								)
+							);
+						this.uploadUnUploadedVoicemails(_verbose);
+					})
+			);
+		});
+	},
+
+	/**
+	 * Close all watchers
+	 */
+	closeWatchers() {
+		watchers.forEach((watcher) => {
+			watcher.close();
+		});
+	},
+
+	/**
+	 * Upload a voicemail
+	 * @param {String} extensionID - The extension ID (e.g. the folder)
+	 * @param {String} voicemailID - The voicemail ID (e.g. the file id msg00001.txt)
+	 * @returns {Boolean} True if the file was uploaded, false otherwise
+	 */
 	async uploadFile(extensionID, file) {
 		const conf = this.getIniConfig(extensionID, file).message;
 		console.log(conf);
@@ -160,20 +217,38 @@ module.exports = {
 			.replace(/</g, "")
 			.replace(/>/g, "");
 
-		await UploadAPI.uploadVoicemail(
-			mbid,
-			conf.callerid,
-			CallerName,
-			CallerPhone,
-			conf.origdate,
-			conf.origtime,
-			conf.msg_id,
-			conf.duration,
-			this.getVoicemailText(extensionID, file),
-			conf.origmailbox,
-			pathToFile
-		);
+		try {
+			let data = await UploadAPI.uploadVoicemail(
+				mbid,
+				conf.callerid,
+				CallerName,
+				CallerPhone,
+				conf.origdate,
+				conf.origtime,
+				conf.msg_id,
+				conf.duration,
+				this.getVoicemailText(extensionID, file),
+				conf.origmailbox,
+				pathToFile
+			);
 
-		this.markVoicemailAsUploaded(extensionID, voicemailID);
+			if (_verbose) {
+				console.log(
+					chalk.bgBlue.white(
+						`\t\t Uploaded voicemail ${voicemailID} from extension ${extensionID}!`
+					)
+				);
+			}
+
+			this.markVoicemailAsUploaded(extensionID, voicemailID);
+
+			if (Settings.deleteVoicemails) {
+				await fs.unlink(pathToFile);
+			}
+		} catch (e) {
+			console.log(chalk.red("FAILED TO UPLOAD VOICEMAIL!!!\n"));
+			console.log(e);
+			return false;
+		}
 	},
 };

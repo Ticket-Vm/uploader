@@ -48,9 +48,13 @@ module.exports = {
 	 * @returns {String} The serverid for the extension
 	 */
 	async getServerIdForExtension(Extension) {
-		return (await this.getUploadableMailboxes()).filter(
+		let r = (await this.getUploadableMailboxes()).filter(
 			(x) => x.extensionid === Extension
 		);
+		if (r.length > 0) {
+			return r[0].id;
+		}
+		throw "Mailbox is not found on the server!";
 	},
 
 	/**
@@ -69,7 +73,7 @@ module.exports = {
 	 */
 	async createNewVoicemailBoxes(verbose = false) {
 		const chalk = require("chalk");
-		let newBoxes = await this.getUnconfiguredInboxes();
+		let newBoxes = this.getUnconfiguredInboxes();
 
 		//If there are no mailboxes exit
 		if (newBoxes.length === 0) {
